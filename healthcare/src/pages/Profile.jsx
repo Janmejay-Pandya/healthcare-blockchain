@@ -123,8 +123,8 @@ const Profile = () => {
 
                 {/* Show Add Doctor button if the user is an admin */}
                 {role === "Admin" && (
-                    <button 
-                        onClick={() => navigate("/add-doctor")} 
+                    <button
+                        onClick={() => navigate("/add-doctor")}
                         className="w-full bg-green-500 text-white py-2 rounded-md mt-6 hover:bg-green-600 transition"
                     >
                         Add Doctor
