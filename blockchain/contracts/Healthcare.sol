@@ -13,13 +13,14 @@ contract Healthcare {
         uint256 weight;
         uint256 height;
         uint256[] caseIds;
-        uint256 passcodeHash; // Hashed passcode
+        uint256 passcodeHash;
     }
 
     struct MedicalCase {
         uint256 caseId;
         address patient;
         bool isOngoing;
+        string caseTitle;
         uint256[] recordIds;
         string[] reportCIDs;
     }
@@ -48,7 +49,7 @@ contract Healthcare {
 
     event DoctorAssigned(address indexed doctor);
     event PatientRegistered(address indexed patient, string fullName);
-    event CaseCreated(uint256 indexed caseId, address indexed patient);
+    event CaseCreated(uint256 indexed caseId, address indexed patient, string caseTitle);
     event RecordAdded(uint256 indexed recordId, uint256 indexed caseId, address indexed doctor);
     event ReportAdded(uint256 indexed caseId, string cid);
     event CaseClosed(uint256 indexed caseId);
@@ -80,40 +81,50 @@ contract Healthcare {
     }
 
     function registerPatient(
-    string memory _fullName,
-    string memory _dob,
-    string memory _addressDetails,
-    string memory _contactNumber,
-    string memory _allergies,
-    uint256 _weight,
-    uint256 _height,
-    uint256 _passcode
-) external {
-    require(bytes(patients[msg.sender].fullName).length == 0, "Patient already registered");
-    patients[msg.sender] = Patient(
-        _fullName,
-        _dob,
-        _addressDetails,
-        _contactNumber,
-        _allergies,
-        _weight,
-        _height,
-        new uint256[](0), // Correctly initialize an empty uint256 array
-        uint256(keccak256(abi.encodePacked(_passcode))) // Correctly hash and store the passcode
-    );
-    emit PatientRegistered(msg.sender, _fullName);
-}
+        string memory _fullName,
+        string memory _dob,
+        string memory _addressDetails,
+        string memory _contactNumber,
+        string memory _allergies,
+        uint256 _weight,
+        uint256 _height,
+        uint256 _passcode
+    ) external {
+        require(bytes(patients[msg.sender].fullName).length == 0, "Patient already registered");
+
+        patients[msg.sender] = Patient({
+            fullName: _fullName,
+            dob: _dob,
+            addressDetails: _addressDetails,
+            contactNumber: _contactNumber,
+            allergies: _allergies,
+            weight: _weight,
+            height: _height,
+            caseIds: new uint256[](0),
+            passcodeHash: uint256(keccak256(abi.encodePacked(_passcode)))
+        });
+        emit PatientRegistered(msg.sender, _fullName);
+    }
 
     function verifyPasscode(address _patient, uint256 _passcode) internal view {
         require(patients[_patient].passcodeHash == uint256(keccak256(abi.encodePacked(_passcode))), "Invalid Passcode");
     }
 
-    function createCase(uint256 _passcode) external onlyPatient {
-        verifyPasscode(msg.sender, _passcode);
+    function createCase(address _patientAddress, uint256 _passcode, string memory _caseTitle) external onlyDoctor {
+        verifyPasscode(_patientAddress, _passcode);
+
         caseCounter++;
-        cases[caseCounter] = MedicalCase(caseCounter, msg.sender, true, new uint256[](0), new string[](0));
-        patients[msg.sender].caseIds.push(caseCounter);
-        emit CaseCreated(caseCounter, msg.sender);
+        cases[caseCounter] = MedicalCase({
+            caseId: caseCounter,
+            patient: _patientAddress,
+            isOngoing: true,
+            caseTitle: _caseTitle,
+            recordIds: new uint256[](0),
+            reportCIDs: new string[](0)
+        });
+
+        patients[_patientAddress].caseIds.push(caseCounter);
+        emit CaseCreated(caseCounter, _patientAddress, _caseTitle);
     }
 
     function addRecord(
@@ -128,8 +139,20 @@ contract Healthcare {
     ) external onlyDoctor {
         verifyPasscode(cases[_caseId].patient, _passcode);
         require(cases[_caseId].isOngoing, "Case is not ongoing");
+
         recordCounter++;
-        records[recordCounter] = MedicalRecord(recordCounter, _caseId, msg.sender, _symptoms, _cause, _inference, _prescription, _advices, _medications);
+        records[recordCounter] = MedicalRecord({
+            recordId: recordCounter,
+            caseId: _caseId,
+            doctor: msg.sender,
+            symptoms: _symptoms,
+            cause: _cause,
+            inference: _inference,
+            prescription: _prescription,
+            advices: _advices,
+            medications: _medications
+        });
+
         cases[_caseId].recordIds.push(recordCounter);
         emit RecordAdded(recordCounter, _caseId, msg.sender);
     }
@@ -137,6 +160,7 @@ contract Healthcare {
     function addReport(uint256 _caseId, uint256 _passcode, string memory _cid) external onlyDoctor {
         verifyPasscode(cases[_caseId].patient, _passcode);
         require(cases[_caseId].isOngoing, "Case is not ongoing");
+
         cases[_caseId].reportCIDs.push(_cid);
         emit ReportAdded(_caseId, _cid);
     }
@@ -144,6 +168,7 @@ contract Healthcare {
     function closeCase(uint256 _caseId, uint256 _passcode) external onlyDoctor {
         verifyPasscode(cases[_caseId].patient, _passcode);
         require(cases[_caseId].isOngoing, "Case is not ongoing");
+
         cases[_caseId].isOngoing = false;
         emit CaseClosed(_caseId);
     }
@@ -159,7 +184,60 @@ contract Healthcare {
         return doctorList;
     }
 
-    function getPatientCases(address _patient) external view returns (uint256[] memory) {
-        return patients[_patient].caseIds;
+    function getMyCases() external view onlyPatient returns (uint256[] memory, string[] memory) {
+        uint256[] memory caseIds = patients[msg.sender].caseIds;
+        string[] memory caseTitles = new string[](caseIds.length);
+
+        for (uint256 i = 0; i < caseIds.length; i++) {
+            caseTitles[i] = cases[caseIds[i]].caseTitle;
+        }
+
+        return (caseIds, caseTitles);
+    }
+
+    function getCaseDetails(uint256 _caseId) public view returns (
+        uint256,
+        address,
+        bool,
+        string memory,
+        uint256[] memory,
+        string[] memory
+    ) {
+        MedicalCase storage medCase = cases[_caseId];
+        return (
+            medCase.caseId,
+            medCase.patient,
+            medCase.isOngoing,
+            medCase.caseTitle,
+            medCase.recordIds,
+            medCase.reportCIDs
+        );
+    }
+
+    function getMyCaseDetails(uint256 _caseId) external view onlyPatient returns (MedicalCase memory) {
+        require(cases[_caseId].patient == msg.sender, "This case does not belong to you");
+        return cases[_caseId];
+    }
+
+    function getMyCaseRecords(uint256 _caseId) external view onlyPatient returns (MedicalRecord[] memory) {
+        require(cases[_caseId].patient == msg.sender, "This case does not belong to you");
+
+        uint256[] memory recordIds = cases[_caseId].recordIds;
+        MedicalRecord[] memory recordsArray = new MedicalRecord[](recordIds.length);
+
+        for (uint256 i = 0; i < recordIds.length; i++) {
+            recordsArray[i] = records[recordIds[i]];
+        }
+
+        return recordsArray;
+    }
+
+    function getMyCaseReports(uint256 _caseId) external view onlyPatient returns (string[] memory) {
+        require(cases[_caseId].patient == msg.sender, "This case does not belong to you");
+        return cases[_caseId].reportCIDs;
+    }
+
+    function getCaseIdsForPatient(address _patientAddress) public view returns (uint256[] memory) {
+        return patients[_patientAddress].caseIds;
     }
 }

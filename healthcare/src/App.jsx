@@ -3,6 +3,9 @@ import Navbar from "./components/Navbar";  // Import Navbar
 import Profile from "./pages/Profile";    // Import your pages
 import Home from "./pages/Home";
 import AddDoctor from "./pages/AddDoctor";
+import PatientDetails from "./pages/PatientDetails";
+import CreateCase from "./pages/CreateCase";
+import ViewHistory from "./pages/ViewHistory";
 
 const App = () => {
     return (
@@ -13,6 +16,9 @@ const App = () => {
                     <Route path="/" element={<Home />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/add-doctor" element={<AddDoctor />} />
+                    <Route path="/patient-details" element={<PatientDetails />} />
+                    <Route path="/create-case" element={<CreateCase />} />
+                    <Route path="/view-history" element={<ViewHistory />} />
                 </Routes>
             </div>
         </>
