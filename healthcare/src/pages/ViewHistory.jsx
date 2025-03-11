@@ -67,42 +67,73 @@ const ViewHistory = () => {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center bg-gray-100 p-6">
-            <div className="w-full max-w-2xl bg-white shadow-lg rounded-lg p-6">
-                <h2 className="text-2xl font-semibold text-center text-gray-800 mb-4">
-                    My Medical History
-                </h2>
+        <div className="min-h-screen bg-black relative">
+            {/* Background dots like in the profile page */}
+            <div className="absolute top-24 left-12 w-2 h-2 rounded-full bg-green-500 opacity-70"></div>
+            <div className="absolute bottom-32 left-8 w-2 h-2 rounded-full bg-green-500 opacity-70"></div>
+            <div className="absolute top-32 right-12 w-2 h-2 rounded-full bg-green-500 opacity-70"></div>
 
-                {error && <p className="text-red-500 text-center">{error}</p>}
+            <div className="flex justify-center items-center p-6 pt-16">
+                <div className="w-full max-w-3xl">
+                    <div className="bg-gray-900 rounded-lg shadow-lg mb-6 p-6">
+                        <h2 className="text-2xl font-semibold text-white mb-4">
+                            Medical History
+                        </h2>
 
-                {loading ? (
-                    <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600"></div>
-                    </div>
-                ) : cases.length === 0 ? (
-                    <p className="text-center text-gray-600">No medical history found.</p>
-                ) : (
-                    <div className="space-y-4">
-                        {cases.map((c) => (
-                            <div
-                                key={c.caseId}
-                                className={`p-4 border rounded-md shadow-md cursor-pointer transition duration-300 hover:shadow-lg ${
-                                    c.isOpen ? "border-green-500 bg-green-100" : "border-gray-400 bg-gray-100"
-                                }`}
-                                onClick={() => handleCaseClick(c.caseId)}
-                            >
-                                <h3 className="font-medium text-lg">{c.caseTitle}</h3>
-                                <p className="text-sm text-gray-600">
-                                    Status: <span className={c.isOpen ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                                        {c.isOpen ? "Ongoing" : "Closed"}
-                                    </span>
-                                </p>
-                                <p className="text-sm text-gray-600">Records: {c.recordIds.length}</p>
-                                <p className="text-sm text-gray-600">Reports: {c.reportCIDs.length}</p>
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-900 bg-opacity-30 border border-red-800 rounded text-red-300 text-center">
+                                {error}
                             </div>
-                        ))}
+                        )}
+
+                        {loading ? (
+                            <div className="flex justify-center py-6">
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-500"></div>
+                            </div>
+                        ) : cases.length === 0 ? (
+                            <div className="py-4 text-gray-400 text-center">
+                                No medical history found.
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {cases.map((c) => (
+                                    <div
+                                        key={c.caseId}
+                                        className="border border-gray-800 bg-gray-800 bg-opacity-50 rounded cursor-pointer"
+                                        onClick={() => handleCaseClick(c.caseId)}
+                                    >
+                                        <div className="p-4">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <h3 className="text-white font-medium">{c.caseTitle}</h3>
+                                                <div className={c.isOpen ? "bg-green-600 text-white rounded px-2 py-1 text-xs" : "bg-gray-700 text-gray-300 rounded px-2 py-1 text-xs"}>
+                                                    Status: {c.isOpen ? "Ongoing" : "Closed"}
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="text-gray-500 text-sm">
+                                                    Records
+                                                    <div className="text-gray-300">{c.recordIds.length}</div>
+                                                </div>
+                                                <div className="text-gray-500 text-sm">
+                                                    Reports
+                                                    <div className="text-gray-300">{c.reportCIDs.length}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="mt-8 flex justify-center">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="px-5 py-2 bg-cyan-800 text-white rounded-md hover:bg-cyan-700 transition duration-300"
+                            >
+                                Back to Dashboard
+                            </button>
+                        </div>
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
