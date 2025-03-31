@@ -6,6 +6,8 @@ import AddDoctor from "./pages/AddDoctor";
 import PatientDetails from "./pages/PatientDetails";
 import CreateCase from "./pages/CreateCase";
 import ViewHistory from "./pages/ViewHistory";
+import CaseDetails from "./pages/CaseDetails";
+import PatientCaseDetails from "./pages/PatientCaseDetails";
 
 const App = () => {
     return (
@@ -19,6 +21,8 @@ const App = () => {
                     <Route path="/patient-details" element={<PatientDetails />} />
                     <Route path="/create-case" element={<CreateCase />} />
                     <Route path="/view-history" element={<ViewHistory />} />
+                    <Route path="/case-details/:caseId" element={<CaseDetails />} />
+                    <Route path="/patient/case-details/:caseId" element={<PatientCaseDetails />} />
                 </Routes>
             </div>
         </>

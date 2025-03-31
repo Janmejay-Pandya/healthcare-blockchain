@@ -35,11 +35,11 @@ const ViewHistory = () => {
                     try {
                         const caseDetails = await contract.getCaseDetails(caseId);
                         return {
-                            caseId: Number(caseDetails[0]),
+                            caseId: caseDetails[0]?.toString(), // Convert BigInt to string
                             patient: caseDetails[1],
                             isOpen: caseDetails[2],
                             caseTitle: caseDetails[3],
-                            recordIds: caseDetails[4] || [],
+                            recordIds: caseDetails[4]?.map(id => id.toString()) || [], // Convert array of BigInts to strings
                             reportCIDs: caseDetails[5] || [],
                         };
                     } catch (err) {
@@ -50,7 +50,7 @@ const ViewHistory = () => {
             );
 
             // Remove null cases and sort: Open cases first
-            const sortedCases = caseData.filter(Boolean).sort((a, b) => b.isOpen - a.isOpen);
+            const sortedCases = caseData.filter(Boolean).sort((a, b) => (b.isOpen ? 1 : 0) - (a.isOpen ? 1 : 0));
             setCases(sortedCases);
         } catch (err) {
             console.error("Error fetching cases:", err);
@@ -61,9 +61,7 @@ const ViewHistory = () => {
     };
 
     const handleCaseClick = (caseId) => {
-        navigate(`/case-details/${caseId}`, {
-            state: { walletAddress: account },
-        });
+        navigate(`/patient/case-details/${caseId}`);
     };
 
     return (

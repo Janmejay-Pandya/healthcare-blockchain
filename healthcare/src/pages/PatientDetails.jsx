@@ -17,7 +17,8 @@ const PatientDetails = () => {
         if (location.state?.refresh && walletAddress) {
             fetchPatientData();
         }
-    }, [location.state]);
+    }, [location.state, walletAddress]);
+    
 
     const calculateAge = (dob) => {
         const birthDate = new Date(dob);
@@ -129,14 +130,15 @@ const PatientDetails = () => {
             state: {
                 walletAddress,
                 passcode: passcode || undefined,
-                caseId: c.caseId,
+                caseId: c.caseId ? c.caseId.toString() : '', // Convert caseId to string
                 caseTitle: c.caseTitle,
                 isOngoing: c.isOngoing,
-                recordIds: c.recordIds,
-                reportCIDs: c.reportCIDs
+                recordIds: c.recordIds ? JSON.stringify(c.recordIds.map(id => id.toString())) : JSON.stringify([]), // Convert array of BigInts to array of strings, then to string
+                reportCIDs: c.reportCIDs ? JSON.stringify(c.reportCIDs) : JSON.stringify([]) // Convert array to string
             }
         });
     };
+    
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100 p-6">
