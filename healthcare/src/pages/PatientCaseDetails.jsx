@@ -192,7 +192,7 @@ const PatientCaseDetails = () => {
 
                     {/* View link (opens in new tab) */}
                     <a
-                      href={`https://ipfs.io/ipfs/${cid}`}
+                      href={`http://127.0.0.1:8080/ipfs/${cid}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-block text-teal-400 hover:underline mb-2"
@@ -203,7 +203,7 @@ const PatientCaseDetails = () => {
                     {/* Optional embedded viewer if it's a PDF */}
                     {cid.endsWith(".pdf") && (
                       <iframe
-                        src={`https://ipfs.io/ipfs/${cid}`}
+                        src={`http://127.0.0.1:8080/ipfs/${cid}`}
                         width="100%"
                         height="400px"
                         title={`Report ${index + 1}`}
