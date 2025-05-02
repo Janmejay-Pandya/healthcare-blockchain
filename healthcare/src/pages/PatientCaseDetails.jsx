@@ -8,7 +8,9 @@ const PatientCaseDetails = () => {
   const { caseId: caseIdParam } = useParams();
   const [caseDetails, setCaseDetails] = useState(null);
   const [records, setRecords] = useState([]);
+  const [formattedRecords, setFormattedRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRecords, setLoadingRecords] = useState(false);
   const [error, setError] = useState("");
 
   const caseId = caseIdParam ? parseInt(caseIdParam, 10) : null;
@@ -22,6 +24,9 @@ const PatientCaseDetails = () => {
   useEffect(() => {
     if (caseDetails?.recordIds?.length > 0) {
       fetchRecords();
+    } else {
+      setRecords([]);
+      setFormattedRecords([]);
     }
   }, [caseDetails]);
 
@@ -46,20 +51,55 @@ const PatientCaseDetails = () => {
     }
   };
 
+  const formatRecordsWithDoctorNames = async (records, contract) => {
+    if (!contract || !records?.length) return [];
+    
+    try {
+      // Get unique doctor addresses
+      const doctorAddresses = [...new Set(records.map(r => r?.doctor).filter(Boolean))];
+      
+      // Batch fetch all doctor names
+      const doctorNames = {};
+      
+      await Promise.all(
+        doctorAddresses.map(async (address) => {
+          try {
+            const patient = await contract.patients(address);
+            doctorNames[address] = patient.fullName || "Unnamed Doctor";
+          } catch (error) {
+            console.error(`Error fetching doctor name for ${address}:`, error);
+            doctorNames[address] = "Unknown Doctor";
+          }
+        })
+      );
+      
+      // Format all records with the names we fetched
+      return records.map(record => ({
+        ...record,
+        doctorName: record?.doctor ? doctorNames[record.doctor] : "Unknown Doctor"
+      }));
+    } catch (error) {
+      console.error("Error formatting records:", error);
+      return records.map(record => ({
+        ...record,
+        doctorName: "Error loading name"
+      }));
+    }
+  };
+
   const fetchRecords = async () => {
     if (!contract || !caseDetails?.recordIds) {
       setRecords([]);
+      setFormattedRecords([]);
       return;
     }
-    setLoading(true);
+    setLoadingRecords(true);
     setError("");
     try {
       const recordDetails = await Promise.all(
         caseDetails.recordIds.map(async (recordId) => {
           try {
             const recordData = await contract.records(recordId);
-            console.log(recordData);
-
             return {
               recordId: recordData.recordId.toString(),
               caseId: recordData.caseId.toString(),
@@ -77,12 +117,18 @@ const PatientCaseDetails = () => {
           }
         })
       );
-      setRecords(recordDetails.filter(Boolean));
+      
+      const validRecords = recordDetails.filter(Boolean);
+      setRecords(validRecords);
+      
+      // Format records with doctor names
+      const formatted = await formatRecordsWithDoctorNames(validRecords, contract);
+      setFormattedRecords(formatted);
     } catch (err) {
       console.error("Error fetching records:", err);
       setError("Failed to fetch records.");
     } finally {
-      setLoading(false);
+      setLoadingRecords(false);
     }
   };
 
@@ -112,63 +158,51 @@ const PatientCaseDetails = () => {
             <h3 className="text-xl font-semibold text-gray-300 mb-4">
               Medical Records
             </h3>
-            {records && records.length > 0 ? (
+            {loadingRecords ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-gray-700 p-4 rounded-lg animate-pulse h-32"></div>
+                ))}
+              </div>
+            ) : formattedRecords.length > 0 ? (
               <div className="mb-6">
-                {records.map((record, index) => (
+                {formattedRecords.map((record, index) => (
                   <div key={index} className="bg-gray-700 p-4 rounded-lg mb-4">
                     <p className="text-sm text-gray-400">
                       Record #{record.recordId}
                     </p>
                     <p className="text-sm text-gray-400 mb-2">
-                      Doctor: {record.doctor}
+                      Doctor: {record.doctorName}
                     </p>
                     {record.symptoms && (
-                      <p>
-                        <span className="font-semibold text-teal-400">
-                          Symptoms:
-                        </span>{" "}
-                        {record.symptoms}
-                      </p>
+                      <div className="mb-2">
+                        <span className="font-semibold text-teal-400">Symptoms:</span> {record.symptoms}
+                      </div>
                     )}
                     {record.cause && (
-                      <p>
-                        <span className="font-semibold text-teal-400">
-                          Cause:
-                        </span>{" "}
-                        {record.cause}
-                      </p>
+                      <div className="mb-2">
+                        <span className="font-semibold text-teal-400">Cause:</span> {record.cause}
+                      </div>
                     )}
                     {record.inference && (
-                      <p>
-                        <span className="font-semibold text-teal-400">
-                          Inference:
-                        </span>{" "}
-                        {record.inference}
-                      </p>
+                      <div className="mb-2">
+                        <span className="font-semibold text-teal-400">Inference:</span> {record.inference}
+                      </div>
                     )}
                     {record.prescription && (
-                      <p>
-                        <span className="font-semibold text-teal-400">
-                          Prescription:
-                        </span>{" "}
-                        {record.prescription}
-                      </p>
+                      <div className="mb-2">
+                        <span className="font-semibold text-teal-400">Prescription:</span> {record.prescription}
+                      </div>
                     )}
                     {record.advices && (
-                      <p>
-                        <span className="font-semibold text-teal-400">
-                          Advice:
-                        </span>{" "}
-                        {record.advices}
-                      </p>
+                      <div className="mb-2">
+                        <span className="font-semibold text-teal-400">Advice:</span> {record.advices}
+                      </div>
                     )}
                     {record.medications && (
-                      <p>
-                        <span className="font-semibold text-teal-400">
-                          Medications:
-                        </span>{" "}
-                        {record.medications}
-                      </p>
+                      <div className="mb-2">
+                        <span className="font-semibold text-teal-400">Medications:</span> {record.medications}
+                      </div>
                     )}
                   </div>
                 ))}

@@ -22,7 +22,9 @@ const CaseDetails = () => {
     // Add passcode state instead of using it directly from location state
     const [passcode, setPasscode] = useState(state.passcode || "");
     const [records, setRecords] = useState([]);
+    const [formattedRecords, setFormattedRecords] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [loadingRecords, setLoadingRecords] = useState(false);
     const [error, setError] = useState("");
     const [ongoing, setOngoing] = useState(isOngoing);
 
@@ -71,23 +73,67 @@ const CaseDetails = () => {
         };
     }, [selectedFile]);
 
+    const formatRecords = async (records, contract) => {
+        if (!contract || !records?.length) return [];
+        
+        try {
+            // Get unique doctor addresses
+            const doctorAddresses = [...new Set(records.map(r => r?.doctor).filter(Boolean))];
+            
+            // Batch fetch all doctor names
+            const doctorNames = {};
+            
+            await Promise.all(
+                doctorAddresses.map(async (address) => {
+                    try {
+                        const patient = await contract.patients(address);
+                        doctorNames[address] = patient.fullName || "Unnamed Doctor";
+                    } catch (error) {
+                        console.error(`Error fetching doctor name for ${address}:`, error);
+                        doctorNames[address] = "Unknown Doctor";
+                    }
+                })
+            );
+            
+            // Format all records with the names we fetched
+            return records.map(record => ({
+                recordId: record?.recordId?.toString() || "Unknown",
+                caseId: record?.caseId?.toString() || "Unknown",
+                doctorAddress: record?.doctor || "Unknown",
+                doctorName: record?.doctor ? doctorNames[record.doctor] : "Unknown Doctor",
+                symptoms: record?.symptoms || "",
+                cause: record?.cause || "",
+                inference: record?.inference || "",
+                prescription: record?.prescription || "",
+                advices: record?.advices || "",
+                medications: record?.medications || ""
+            }));
+        } catch (error) {
+            console.error("Error formatting records:", error);
+            return records.map(record => ({
+                ...record,
+                doctorName: "Error loading name"
+            }));
+        }
+    };
+
     const fetchRecords = async () => {
         try {
+            setLoadingRecords(true);
             if (!contract) {
                 setError("Contract not initialized.");
                 return;
             }
             if (!recordIds || !recordIds.length) {
                 setRecords([]);
+                setFormattedRecords([]);
                 return;
             }
 
             const recordDetails = await Promise.all(
                 recordIds.map(async (recordId) => {
                     try {
-                        // Fetch each record directly from the contract using its ID
-                        const recordData = await contract.records(recordId);
-                        return recordData;
+                        return await contract.records(recordId);
                     } catch (err) {
                         console.error(`Error fetching record ${recordId}:`, err);
                         return null;
@@ -95,19 +141,22 @@ const CaseDetails = () => {
                 })
             );
 
-            setRecords(recordDetails.filter(Boolean));
+            const validRecords = recordDetails.filter(Boolean);
+            setRecords(validRecords);
+            
+            // Format records with doctor names
+            const formatted = await formatRecords(validRecords, contract);
+            setFormattedRecords(formatted);
         } catch (err) {
             console.error("Error fetching records:", err);
             setError("Failed to fetch records.");
+        } finally {
+            setLoadingRecords(false);
         }
     };
 
-    
-
     // Helper function to guess if a CID might point to an image
     const guessIsImage = (cid) => {
-        // This is just a basic check if we have metadata about the file type
-        // In a real app, you might store metadata about file types in the contract
         return cid.toLowerCase().includes('image') || cid.match(/\.(jpg|jpeg|png|gif|svg|webp)$/i);
     };
 
@@ -130,22 +179,10 @@ const CaseDetails = () => {
         setError("");
 
         try {
-            // Validate inputs
             const numCaseId = parseInt(caseId);
             if (isNaN(numCaseId)) {
                 throw new Error("Invalid case ID");
             }
-
-            console.log("Adding record with params:", {
-                caseId: numCaseId,
-                passcode,
-                symptoms,
-                cause,
-                inference,
-                prescription,
-                advices,
-                medications
-            });
 
             const tx = await contract.addRecord(
                 numCaseId,
@@ -158,9 +195,7 @@ const CaseDetails = () => {
                 medications
             );
 
-            console.log("Transaction sent:", tx.hash);
             await tx.wait();
-            console.log("Transaction confirmed");
 
             // Clear form fields
             setSymptoms("");
@@ -171,15 +206,12 @@ const CaseDetails = () => {
             setMedications("");
 
             // Refresh records
-            fetchRecords();
+            await fetchRecords();
         } catch (err) {
             console.error("Error adding record:", err);
-
-            // More detailed error reporting
             let errorMessage = "Failed to add record";
             if (err.reason) errorMessage += `: ${err.reason}`;
             else if (err.message) errorMessage += `: ${err.message}`;
-
             setError(errorMessage);
         } finally {
             setLoading(false);
@@ -215,23 +247,16 @@ const CaseDetails = () => {
         setError("");
     
         try {
-            // Upload to IPFS using the corrected service
             const cid = await addFileToIPFS(selectedFile);
-            console.log("File uploaded to IPFS with CID:", cid);
-            
             setUploadStatus("File uploaded to IPFS. Adding to blockchain...");
     
-            // Validate inputs
             const numCaseId = parseInt(caseId);
             if (isNaN(numCaseId)) {
                 throw new Error("Invalid case ID");
             }
     
-            // Add report CID to blockchain
             const tx = await contract.addReport(numCaseId, passcode, cid);
-            console.log("Transaction sent:", tx.hash);
             await tx.wait();
-            console.log("Transaction confirmed");
     
             setUploadStatus("Report added successfully!");
             setSelectedFile(null);
@@ -240,7 +265,6 @@ const CaseDetails = () => {
             }
             setFilePreview(null);
     
-            // Add the new report to state
             const newReport = {
                 cid,
                 url: getFileFromIPFS(cid),
@@ -249,12 +273,9 @@ const CaseDetails = () => {
             setReports([...reports, newReport]);
         } catch (err) {
             console.error("Error adding report:", err);
-    
-            // More detailed error reporting
             let errorMessage = "Failed to add report";
             if (err.reason) errorMessage += `: ${err.reason}`;
             else if (err.message) errorMessage += `: ${err.message}`;
-    
             setError(errorMessage);
             setUploadStatus("");
         } finally {
@@ -262,7 +283,6 @@ const CaseDetails = () => {
         }
     };
     
-    // Also update the fetchReports function to use the corrected service:
     const fetchReports = async () => {
         try {
             if (reportCIDs && reportCIDs.length > 0) {
@@ -292,51 +312,24 @@ const CaseDetails = () => {
         setError("");
 
         try {
-            // Validate inputs
             const numCaseId = parseInt(caseId);
             if (isNaN(numCaseId)) {
                 throw new Error("Invalid case ID");
             }
 
-            console.log("Closing case with params:", {
-                caseId: numCaseId,
-                passcode
-            });
-
             const tx = await contract.closeCase(numCaseId, passcode);
-            console.log("Transaction sent:", tx.hash);
-
             await tx.wait();
-            console.log("Transaction confirmed");
 
             setOngoing(false);
         } catch (err) {
             console.error("Error closing case:", err);
-
-            // More detailed error reporting
             let errorMessage = "Failed to close case";
             if (err.reason) errorMessage += `: ${err.reason}`;
             else if (err.message) errorMessage += `: ${err.message}`;
-
             setError(errorMessage);
         } finally {
             setLoading(false);
         }
-    };
-
-    const formatRecord = (record) => {
-        // Safely format record data from the blockchain
-        return {
-            recordId: record?.recordId?.toString() || "Unknown",
-            caseId: record?.caseId?.toString() || "Unknown",
-            doctor: record?.doctor || "Unknown",
-            symptoms: record?.symptoms || "",
-            cause: record?.cause || "",
-            inference: record?.inference || "",
-            prescription: record?.prescription || "",
-            advices: record?.advices || "",
-            medications: record?.medications || ""
-        };
     };
 
     // Gets file type icon based on URL or name
@@ -395,7 +388,6 @@ const CaseDetails = () => {
                                     <p className="text-sm text-gray-400">Report #{index + 1}</p>
                                 </div>
                                 
-                                {/* Preview for images */}
                                 {report.isImage && (
                                     <div className="mb-2 bg-gray-600 rounded overflow-hidden">
                                         <img 
@@ -440,7 +432,6 @@ const CaseDetails = () => {
                             />
                         </div>
                         
-                        {/* Preview selected file if it's an image */}
                         {filePreview && (
                             <div className="mb-3 bg-gray-600 rounded-md overflow-hidden">
                                 <img 
@@ -478,53 +469,56 @@ const CaseDetails = () => {
 
                 {/* Records Section */}
                 <h3 className="text-xl font-semibold text-gray-300 mb-4">Medical Records</h3>
-                {records && records.length > 0 ? (
+                {loadingRecords ? (
+                    <div className="space-y-4">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="bg-gray-700 p-4 rounded-lg animate-pulse h-32"></div>
+                        ))}
+                    </div>
+                ) : formattedRecords.length > 0 ? (
                     <div className="mb-6">
-                        {records.map((record, index) => {
-                            const formattedRecord = formatRecord(record);
-                            return (
-                                <div key={index} className="bg-gray-700 p-4 rounded-lg mb-4">
-                                    <p className="text-sm text-gray-400">Record #{formattedRecord.recordId}</p>
-                                    <p className="text-sm text-gray-400 mb-2">Doctor: {formattedRecord.doctor}</p>
+                        {formattedRecords.map((record, index) => (
+                            <div key={index} className="bg-gray-700 p-4 rounded-lg mb-4">
+                                <p className="text-sm text-gray-400">Record #{record.recordId}</p>
+                                <p className="text-sm text-gray-400 mb-2">Doctor: {record.doctorName}</p>
 
-                                    {formattedRecord.symptoms && (
-                                        <div className="mb-2">
-                                            <span className="font-semibold text-teal-400">Symptoms:</span> {formattedRecord.symptoms}
-                                        </div>
-                                    )}
+                                {record.symptoms && (
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-teal-400">Symptoms:</span> {record.symptoms}
+                                    </div>
+                                )}
 
-                                    {formattedRecord.cause && (
-                                        <div className="mb-2">
-                                            <span className="font-semibold text-teal-400">Cause:</span> {formattedRecord.cause}
-                                        </div>
-                                    )}
+                                {record.cause && (
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-teal-400">Cause:</span> {record.cause}
+                                    </div>
+                                )}
 
-                                    {formattedRecord.inference && (
-                                        <div className="mb-2">
-                                            <span className="font-semibold text-teal-400">Inference:</span> {formattedRecord.inference}
-                                        </div>
-                                    )}
+                                {record.inference && (
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-teal-400">Inference:</span> {record.inference}
+                                    </div>
+                                )}
 
-                                    {formattedRecord.prescription && (
-                                        <div className="mb-2">
-                                            <span className="font-semibold text-teal-400">Prescription:</span> {formattedRecord.prescription}
-                                        </div>
-                                    )}
+                                {record.prescription && (
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-teal-400">Prescription:</span> {record.prescription}
+                                    </div>
+                                )}
 
-                                    {formattedRecord.advices && (
-                                        <div className="mb-2">
-                                            <span className="font-semibold text-teal-400">Advice:</span> {formattedRecord.advices}
-                                        </div>
-                                    )}
+                                {record.advices && (
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-teal-400">Advice:</span> {record.advices}
+                                    </div>
+                                )}
 
-                                    {formattedRecord.medications && (
-                                        <div className="mb-2">
-                                            <span className="font-semibold text-teal-400">Medications:</span> {formattedRecord.medications}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                {record.medications && (
+                                    <div className="mb-2">
+                                        <span className="font-semibold text-teal-400">Medications:</span> {record.medications}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 ) : (
                     <p className="text-gray-400 mb-6">No records found.</p>
