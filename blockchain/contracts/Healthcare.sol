@@ -49,8 +49,16 @@ contract Healthcare {
 
     event DoctorAssigned(address indexed doctor);
     event PatientRegistered(address indexed patient, string fullName);
-    event CaseCreated(uint256 indexed caseId, address indexed patient, string caseTitle);
-    event RecordAdded(uint256 indexed recordId, uint256 indexed caseId, address indexed doctor);
+    event CaseCreated(
+        uint256 indexed caseId,
+        address indexed patient,
+        string caseTitle
+    );
+    event RecordAdded(
+        uint256 indexed recordId,
+        uint256 indexed caseId,
+        address indexed doctor
+    );
     event ReportAdded(uint256 indexed caseId, string cid);
     event CaseClosed(uint256 indexed caseId);
 
@@ -65,7 +73,10 @@ contract Healthcare {
     }
 
     modifier onlyPatient() {
-        require(bytes(patients[msg.sender].fullName).length > 0, "Not a registered patient");
+        require(
+            bytes(patients[msg.sender].fullName).length > 0,
+            "Not a registered patient"
+        );
         _;
     }
 
@@ -90,7 +101,10 @@ contract Healthcare {
         uint256 _height,
         uint256 _passcode
     ) external {
-        require(bytes(patients[msg.sender].fullName).length == 0, "Patient already registered");
+        require(
+            bytes(patients[msg.sender].fullName).length == 0,
+            "Patient already registered"
+        );
 
         patients[msg.sender] = Patient({
             fullName: _fullName,
@@ -107,10 +121,18 @@ contract Healthcare {
     }
 
     function verifyPasscode(address _patient, uint256 _passcode) internal view {
-        require(patients[_patient].passcodeHash == uint256(keccak256(abi.encodePacked(_passcode))), "Invalid Passcode");
+        require(
+            patients[_patient].passcodeHash ==
+                uint256(keccak256(abi.encodePacked(_passcode))),
+            "Invalid Passcode"
+        );
     }
 
-    function createCase(address _patientAddress, uint256 _passcode, string memory _caseTitle) external onlyDoctor {
+    function createCase(
+        address _patientAddress,
+        uint256 _passcode,
+        string memory _caseTitle
+    ) external onlyDoctor {
         verifyPasscode(_patientAddress, _passcode);
 
         caseCounter++;
@@ -157,7 +179,11 @@ contract Healthcare {
         emit RecordAdded(recordCounter, _caseId, msg.sender);
     }
 
-    function addReport(uint256 _caseId, uint256 _passcode, string memory _cid) external onlyDoctor {
+    function addReport(
+        uint256 _caseId,
+        uint256 _passcode,
+        string memory _cid
+    ) external onlyDoctor {
         verifyPasscode(cases[_caseId].patient, _passcode);
         require(cases[_caseId].isOngoing, "Case is not ongoing");
 
@@ -184,7 +210,12 @@ contract Healthcare {
         return doctorList;
     }
 
-    function getMyCases() external view onlyPatient returns (uint256[] memory, string[] memory) {
+    function getMyCases()
+        external
+        view
+        onlyPatient
+        returns (uint256[] memory, string[] memory)
+    {
         uint256[] memory caseIds = patients[msg.sender].caseIds;
         string[] memory caseTitles = new string[](caseIds.length);
 
@@ -195,14 +226,20 @@ contract Healthcare {
         return (caseIds, caseTitles);
     }
 
-    function getCaseDetails(uint256 _caseId) public view returns (
-        uint256,
-        address,
-        bool,
-        string memory,
-        uint256[] memory,
-        string[] memory
-    ) {
+    function getCaseDetails(
+        uint256 _caseId
+    )
+        public
+        view
+        returns (
+            uint256,
+            address,
+            bool,
+            string memory,
+            uint256[] memory,
+            string[] memory
+        )
+    {
         MedicalCase storage medCase = cases[_caseId];
         return (
             medCase.caseId,
@@ -214,16 +251,28 @@ contract Healthcare {
         );
     }
 
-    function getMyCaseDetails(uint256 _caseId) external view onlyPatient returns (MedicalCase memory) {
-        require(cases[_caseId].patient == msg.sender, "This case does not belong to you");
+    function getMyCaseDetails(
+        uint256 _caseId
+    ) external view onlyPatient returns (MedicalCase memory) {
+        require(
+            cases[_caseId].patient == msg.sender,
+            "This case does not belong to you"
+        );
         return cases[_caseId];
     }
 
-    function getMyCaseRecords(uint256 _caseId) external view onlyPatient returns (MedicalRecord[] memory) {
-        require(cases[_caseId].patient == msg.sender, "This case does not belong to you");
+    function getMyCaseRecords(
+        uint256 _caseId
+    ) external view onlyPatient returns (MedicalRecord[] memory) {
+        require(
+            cases[_caseId].patient == msg.sender,
+            "This case does not belong to you"
+        );
 
         uint256[] memory recordIds = cases[_caseId].recordIds;
-        MedicalRecord[] memory recordsArray = new MedicalRecord[](recordIds.length);
+        MedicalRecord[] memory recordsArray = new MedicalRecord[](
+            recordIds.length
+        );
 
         for (uint256 i = 0; i < recordIds.length; i++) {
             recordsArray[i] = records[recordIds[i]];
@@ -232,12 +281,64 @@ contract Healthcare {
         return recordsArray;
     }
 
-    function getMyCaseReports(uint256 _caseId) external view onlyPatient returns (string[] memory) {
-        require(cases[_caseId].patient == msg.sender, "This case does not belong to you");
+    function getMyCaseReports(
+        uint256 _caseId
+    ) external view onlyPatient returns (string[] memory) {
+        require(
+            cases[_caseId].patient == msg.sender,
+            "This case does not belong to you"
+        );
         return cases[_caseId].reportCIDs;
     }
 
-    function getCaseIdsForPatient(address _patientAddress) public view returns (uint256[] memory) {
+    function getCaseIdsForPatient(
+        address _patientAddress
+    ) public view returns (uint256[] memory) {
         return patients[_patientAddress].caseIds;
+    }
+
+    function verifyPatientAccess(
+        address _patientAddress,
+        uint256 _passcode
+    ) public view returns (bool) {
+        // Return true if passcode matches or if the caller is the patient themselves
+        return
+            (msg.sender == _patientAddress) ||
+            (patients[_patientAddress].passcodeHash ==
+                uint256(keccak256(abi.encodePacked(_passcode))));
+    }
+
+    function getPatientDetailsWithPasscode(
+        address _patientAddress,
+        uint256 _passcode
+    )
+        public
+        view
+        returns (
+            string memory fullName,
+            string memory dob,
+            string memory addressDetails,
+            string memory contactNumber,
+            string memory allergies,
+            uint256 weight,
+            uint256 height
+        )
+    {
+        // Verify access rights
+        require(
+            verifyPatientAccess(_patientAddress, _passcode),
+            "Access denied: Invalid passcode"
+        );
+
+        Patient storage patient = patients[_patientAddress];
+        return (
+            patient.fullName,
+            patient.dob,
+            patient.addressDetails,
+            patient.contactNumber,
+            patient.allergies,
+            patient.weight,
+            patient.height
+        );
     }
 }

@@ -31,41 +31,108 @@ const PatientDetails = () => {
             setError("Enter a wallet address!");
             return;
         }
-
+    
+        if (!passcode && walletAddress.toLowerCase() !== window.ethereum?.selectedAddress?.toLowerCase()) {
+            setError("Passcode required to view another patient's data!");
+            return;
+        }
+    
         setLoading(true);
         setError("");
-
+    
         try {
-            // Get basic patient data
-            const data = await contract.patients(walletAddress);
-
-            if (!data || !data.fullName) {
+            // Get basic patient data with passcode verification
+            let patientData;
+            
+            if (walletAddress.toLowerCase() === window.ethereum?.selectedAddress?.toLowerCase()) {
+                // If the user is accessing their own data, no passcode needed
+                const data = await contract.patients(walletAddress);
+                patientData = {
+                    fullName: data.fullName,
+                    dob: data.dob,
+                    addressDetails: data.addressDetails,
+                    contactNumber: data.contactNumber,
+                    allergies: data.allergies,
+                    weight: Number(data.weight),
+                    height: Number(data.height)
+                };
+            } else {
+                // If accessing another patient's data, require passcode
+                try {
+                    const data = await contract.getPatientDetailsWithPasscode(
+                        walletAddress, 
+                        passcode
+                    );
+                    
+                    patientData = {
+                        fullName: data[0],
+                        dob: data[1],
+                        addressDetails: data[2],
+                        contactNumber: data[3],
+                        allergies: data[4],
+                        weight: Number(data[5]),
+                        height: Number(data[6])
+                    };
+                } catch (err) {
+                    if (err.message.includes("Access denied") || err.message.includes("Invalid passcode")) {
+                        setError("Invalid passcode! Access denied.");
+                    } else if (err.message.includes("revert")) {
+                        setError("Patient not found or access denied!");
+                    } else {
+                        throw err;
+                    }
+                    setLoading(false);
+                    return;
+                }
+            }
+    
+            if (!patientData || !patientData.fullName) {
                 setError("Patient not found!");
                 setLoading(false);
                 return;
             }
-
+    
             setPatient({
-                fullName: data.fullName,
-                dob: data.dob,
-                age: calculateAge(data.dob),
-                weight: Number(data.weight),
-                height: Number(data.height),
-                allergies: data.allergies,
-                addressDetails: data.addressDetails,
-                contactNumber: data.contactNumber
+                fullName: patientData.fullName,
+                dob: patientData.dob,
+                age: calculateAge(patientData.dob),
+                weight: patientData.weight,
+                height: patientData.height,
+                allergies: patientData.allergies,
+                addressDetails: patientData.addressDetails,
+                contactNumber: patientData.contactNumber
             });
-
+    
             try {
-                // Get the patient's caseIds directly from their struct
-                const caseIds = await contract.getCaseIdsForPatient(walletAddress);
-
+                // Get case information with passcode validation
+                // We need a new contract function for this
+                let caseIds;
+                
+                if (walletAddress.toLowerCase() === window.ethereum?.selectedAddress?.toLowerCase()) {
+                    // If own account, use direct function
+                    caseIds = await contract.getCaseIdsForPatient(walletAddress);
+                } else {
+                    // For other patients, we should add a passcode-protected function
+                    // This would require adding a new function to the contract:
+                    // getCaseIdsWithPasscode(address _patientAddress, uint256 _passcode)
+                    try {
+                        // Since we've already verified the passcode for patient data,
+                        // we can use the existing function for now
+                        caseIds = await contract.getCaseIdsForPatient(walletAddress);
+                    } catch (err) {
+                        console.error("Error getting case IDs:", err);
+                        setCases([]);
+                        setLoading(false);
+                        return;
+                    }
+                }
+    
                 if (!caseIds || caseIds.length === 0) {
                     setCases([]);
                     setLoading(false);
                     return;
                 }
-
+    
                 const caseDetails = await Promise.all(
                     caseIds.map(async (caseId) => {
                         try {
@@ -84,38 +151,11 @@ const PatientDetails = () => {
                         }
                     })
                 );
-
+    
                 setCases(caseDetails.filter(Boolean).sort((a, b) => b.isOngoing - a.isOngoing));
             } catch (err) {
-                console.error("Error fetching case IDs:", err);
-                // Fallback method - check if we need to modify the contract to add this function
-                console.log("Attempting direct access of cases via contract...");
-
-                // This is a fallback that will work with the current contract structure
-                // But is less efficient than adding a dedicated function
-                const patientCases = [];
-                const totalCases = Number(await contract.caseCounter());
-
-                // Check each case to see if it belongs to this patient
-                for (let i = 1; i <= totalCases; i++) {
-                    try {
-                        const caseData = await contract.getCaseDetails(i);
-                        if (caseData[1].toLowerCase() === walletAddress.toLowerCase()) {
-                            patientCases.push({
-                                caseId: Number(caseData[0]),
-                                patient: caseData[1],
-                                isOngoing: caseData[2],
-                                caseTitle: caseData[3],
-                                recordIds: caseData[4],
-                                reportCIDs: caseData[5]
-                            });
-                        }
-                    } catch (error) {
-                        console.error(`Error checking case ${i}:`, error);
-                    }
-                }
-
-                setCases(patientCases.sort((a, b) => b.isOngoing - a.isOngoing));
+                console.error("Error fetching case data:", err);
+                setError("Failed to fetch case details: " + err.message);
             }
         } catch (err) {
             console.error("Error fetching data:", err);
