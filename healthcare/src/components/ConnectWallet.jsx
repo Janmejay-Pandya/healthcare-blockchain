@@ -13,8 +13,12 @@ const ConnectWallet = () => {
             await connectWallet();
             navigate("/profile"); // Redirect to dashboard after connection
         } else {
-            navigate("/profile"); // Just redirect if already connected
+            navigate("/patientdashboard"); // Just redirect if already connected 
+            //gets redirected to the patient dashboard for both doctor and patient
         }
+        console.log("Account:", account);
+        console.log("Connected to wallet:", account);
+
     };
 
     return (

@@ -18,6 +18,7 @@ const CaseDetails = () => {
     const isOngoing = state.isOngoing || false;
     const recordIds = state.recordIds ? JSON.parse(state.recordIds) : [];
     const reportCIDs = state.reportCIDs ? JSON.parse(state.reportCIDs) : [];
+    console.log("recordIds", recordIds);
 
     // Add passcode state instead of using it directly from location state
     const [passcode, setPasscode] = useState(state.passcode || "");
@@ -75,14 +76,14 @@ const CaseDetails = () => {
 
     const formatRecords = async (records, contract) => {
         if (!contract || !records?.length) return [];
-        
+
         try {
             // Get unique doctor addresses
             const doctorAddresses = [...new Set(records.map(r => r?.doctor).filter(Boolean))];
-            
+
             // Batch fetch all doctor names
             const doctorNames = {};
-            
+
             await Promise.all(
                 doctorAddresses.map(async (address) => {
                     try {
@@ -94,7 +95,7 @@ const CaseDetails = () => {
                     }
                 })
             );
-            
+
             // Format all records with the names we fetched
             return records.map(record => ({
                 recordId: record?.recordId?.toString() || "Unknown",
@@ -143,10 +144,12 @@ const CaseDetails = () => {
 
             const validRecords = recordDetails.filter(Boolean);
             setRecords(validRecords);
-            
+
             // Format records with doctor names
             const formatted = await formatRecords(validRecords, contract);
             setFormattedRecords(formatted);
+            console.log("Formatted Records:", formatted);
+
         } catch (err) {
             console.error("Error fetching records:", err);
             setError("Failed to fetch records.");
@@ -222,7 +225,7 @@ const CaseDetails = () => {
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        
+
         setSelectedFile(file);
         setUploadStatus("");
     };
@@ -241,30 +244,30 @@ const CaseDetails = () => {
             setError("Passcode is required to add a report.");
             return;
         }
-    
+
         setLoading(true);
         setUploadStatus("Uploading to IPFS...");
         setError("");
-    
+
         try {
             const cid = await addFileToIPFS(selectedFile);
             setUploadStatus("File uploaded to IPFS. Adding to blockchain...");
-    
+
             const numCaseId = parseInt(caseId);
             if (isNaN(numCaseId)) {
                 throw new Error("Invalid case ID");
             }
-    
+
             const tx = await contract.addReport(numCaseId, passcode, cid);
             await tx.wait();
-    
+
             setUploadStatus("Report added successfully!");
             setSelectedFile(null);
             if (fileInputRef.current) {
                 fileInputRef.current.value = "";
             }
             setFilePreview(null);
-    
+
             const newReport = {
                 cid,
                 url: getFileFromIPFS(cid),
@@ -282,7 +285,7 @@ const CaseDetails = () => {
             setLoading(false);
         }
     };
-    
+
     const fetchReports = async () => {
         try {
             if (reportCIDs && reportCIDs.length > 0) {
@@ -335,7 +338,7 @@ const CaseDetails = () => {
     // Gets file type icon based on URL or name
     const getFileIcon = (file) => {
         const url = file.url?.toLowerCase() || "";
-        
+
         if (file.isImage || url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
             return "📷";
         } else if (url.match(/\.(pdf)$/i)) {
@@ -353,7 +356,7 @@ const CaseDetails = () => {
         <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
             <div className="max-w-4xl mx-auto bg-gray-800 p-6 rounded-lg shadow-lg">
                 <IPFSStatus />
-                
+
                 <h2 className="text-2xl font-bold text-teal-500 mb-4">{caseTitle}</h2>
                 <p className="text-gray-400 mb-4">Case ID: #{caseId}</p>
                 <p className={`mb-4 ${ongoing ? "text-green-400" : "text-red-400"}`}>
@@ -387,12 +390,12 @@ const CaseDetails = () => {
                                     <span className="text-2xl mr-2">{getFileIcon(report)}</span>
                                     <p className="text-sm text-gray-400">Report #{index + 1}</p>
                                 </div>
-                                
+
                                 {report.isImage && (
                                     <div className="mb-2 bg-gray-600 rounded overflow-hidden">
-                                        <img 
-                                            src={report.url} 
-                                            alt="Report preview" 
+                                        <img
+                                            src={report.url}
+                                            alt="Report preview"
                                             className="w-full h-auto object-contain max-h-40"
                                             onError={(e) => {
                                                 e.target.onerror = null;
@@ -401,10 +404,10 @@ const CaseDetails = () => {
                                         />
                                     </div>
                                 )}
-                                
-                                <a 
-                                    href={report.url} 
-                                    target="_blank" 
+
+                                <a
+                                    href={report.url}
+                                    target="_blank"
                                     rel="noopener noreferrer"
                                     className="block text-teal-400 hover:underline"
                                 >
@@ -431,17 +434,17 @@ const CaseDetails = () => {
                                 className="w-full p-2 bg-gray-600 border border-gray-500 text-gray-200 rounded-md"
                             />
                         </div>
-                        
+
                         {filePreview && (
                             <div className="mb-3 bg-gray-600 rounded-md overflow-hidden">
-                                <img 
-                                    src={filePreview} 
-                                    alt="Selected file preview" 
-                                    className="w-full h-auto object-contain max-h-60" 
+                                <img
+                                    src={filePreview}
+                                    alt="Selected file preview"
+                                    className="w-full h-auto object-contain max-h-60"
                                 />
                             </div>
                         )}
-                        
+
                         {selectedFile && !filePreview && (
                             <div className="mb-3 p-2 bg-gray-600 rounded-md">
                                 <div className="flex items-center">
@@ -453,7 +456,7 @@ const CaseDetails = () => {
                                 </span>
                             </div>
                         )}
-                        
+
                         <button
                             onClick={handleAddReport}
                             className="w-full p-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 transition"

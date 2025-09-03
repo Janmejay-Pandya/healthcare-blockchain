@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useBlockchain } from "../context/BlockchainContext";
 import { useNavigate, useLocation } from "react-router-dom";
+import Summary from "../components/Summary";
 
 const PatientDetails = () => {
     const { contract } = useBlockchain();
@@ -12,13 +13,14 @@ const PatientDetails = () => {
     const [cases, setCases] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showSummary, setShowSummary] = useState(false);
 
     useEffect(() => {
         if (location.state?.refresh && walletAddress) {
             fetchPatientData();
         }
     }, [location.state, walletAddress]);
-    
+
 
     const calculateAge = (dob) => {
         const birthDate = new Date(dob);
@@ -31,19 +33,19 @@ const PatientDetails = () => {
             setError("Enter a wallet address!");
             return;
         }
-    
+
         if (!passcode && walletAddress.toLowerCase() !== window.ethereum?.selectedAddress?.toLowerCase()) {
             setError("Passcode required to view another patient's data!");
             return;
         }
-    
+
         setLoading(true);
         setError("");
-    
+
         try {
             // Get basic patient data with passcode verification
             let patientData;
-            
+
             if (walletAddress.toLowerCase() === window.ethereum?.selectedAddress?.toLowerCase()) {
                 // If the user is accessing their own data, no passcode needed
                 const data = await contract.patients(walletAddress);
@@ -60,10 +62,10 @@ const PatientDetails = () => {
                 // If accessing another patient's data, require passcode
                 try {
                     const data = await contract.getPatientDetailsWithPasscode(
-                        walletAddress, 
+                        walletAddress,
                         passcode
                     );
-                    
+
                     patientData = {
                         fullName: data[0],
                         dob: data[1],
@@ -85,13 +87,13 @@ const PatientDetails = () => {
                     return;
                 }
             }
-    
+
             if (!patientData || !patientData.fullName) {
                 setError("Patient not found!");
                 setLoading(false);
                 return;
             }
-    
+
             setPatient({
                 fullName: patientData.fullName,
                 dob: patientData.dob,
@@ -102,12 +104,12 @@ const PatientDetails = () => {
                 addressDetails: patientData.addressDetails,
                 contactNumber: patientData.contactNumber
             });
-    
+
             try {
                 // Get case information with passcode validation
                 // We need a new contract function for this
                 let caseIds;
-                
+
                 if (walletAddress.toLowerCase() === window.ethereum?.selectedAddress?.toLowerCase()) {
                     // If own account, use direct function
                     caseIds = await contract.getCaseIdsForPatient(walletAddress);
@@ -126,13 +128,13 @@ const PatientDetails = () => {
                         return;
                     }
                 }
-    
+
                 if (!caseIds || caseIds.length === 0) {
                     setCases([]);
                     setLoading(false);
                     return;
                 }
-    
+
                 const caseDetails = await Promise.all(
                     caseIds.map(async (caseId) => {
                         try {
@@ -151,7 +153,7 @@ const PatientDetails = () => {
                         }
                     })
                 );
-    
+
                 setCases(caseDetails.filter(Boolean).sort((a, b) => b.isOngoing - a.isOngoing));
             } catch (err) {
                 console.error("Error fetching case data:", err);
@@ -178,7 +180,7 @@ const PatientDetails = () => {
             }
         });
     };
-    
+
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100 p-6">
@@ -308,10 +310,23 @@ const PatientDetails = () => {
 
                                 {/* Medical Cases - Right Side */}
                                 <div className="w-full lg:w-2/3 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 shadow-xl overflow-hidden">
-                                    <div className="bg-teal-600/20 p-4 border-b border-gray-700">
+                                    <div className="bg-teal-600/20 p-4 border-b border-gray-700 flex justify-between items-center">
                                         <h3 className="text-xl font-bold text-teal-400">
                                             Medical Cases {cases.length > 0 && `(${cases.length})`}
                                         </h3>
+                                        <button
+                                            onClick={() => setShowSummary(true)}
+                                            className="text-gray-300 hover:text-teal-400 transition">
+                                            View Summary
+                                        </button>
+                                        {showSummary && (
+                                            <Summary
+                                                patient={patient}
+                                                cases={cases}
+                                                onClose={() => setShowSummary(false)}
+                                            />
+                                        )}
+
                                     </div>
 
                                     <div className="p-6">
@@ -386,7 +401,7 @@ const PatientDetails = () => {
                     </>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 
