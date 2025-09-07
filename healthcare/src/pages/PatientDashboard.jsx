@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useBlockchain } from '../context/BlockchainContext';
+import Chatbot from '../components/Chatbot';
 
 const PatientDashboard = () => {
     const { account, contract } = useBlockchain();
@@ -179,12 +179,7 @@ const PatientDashboard = () => {
 
             {/* Schedule Appointment Button */}
             <div className="fixed bottom-8 right-8">
-                <button className="bg-green-500 hover:bg-green-600 text-black font-medium px-6 py-3 rounded-lg flex items-center">
-                    Schedule Appointment
-                    <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                    </svg>
-                </button>
+                <Chatbot />
             </div>
 
             {/* Decorative Dots */}
